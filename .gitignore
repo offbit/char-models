@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.idea
+*.hdf5
+
+# IPython Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pickle files
+
+*.pickle
+
+# msgpack files ( json binary format)
+
+*.msgpack
+*.npy
+*.pkl

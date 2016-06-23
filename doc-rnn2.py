@@ -34,6 +34,17 @@ def striphtml(html):
 def clean(s):
     return re.sub(r'[^\x00-\x7f]', r'', s)
 
+# record history of training 
+class LossHistory(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = []
+        self.accuracies = []
+
+    def on_batch_end(self, batch, logs={}):
+        self.losses.append(logs.get('loss'))
+        self.accuracies.append(logs.get('acc'))
+
+
 total = len(sys.argv)
 cmdargs = str(sys.argv)
 
@@ -93,20 +104,22 @@ np.random.shuffle(ids)
 X = X[ids]
 y = y[ids]
 
-X_train = X[:100]
-X_test = X[-5:]
+X_train = X[:20000]
+X_test = X[20000:]
 
-y_train = y[:100]
-y_test = y[-5:]
+y_train = y[:20000]
+y_test = y[20000:]
 
 filter_length = [5, 3, 3]
 nb_filter = [196, 196, 256]
 pool_length = 2
-
-sequence = Input(shape=(max_sentences, maxlen), dtype='int64')
+# document input
+document = Input(shape=(max_sentences, maxlen), dtype='int64')
+# sentence input
 in_sentence = Input(shape=(maxlen,), dtype='int64')
+# char indices to one hot matrix, 1D sequence to 2D 
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
-
+# embedded: encodes sentence
 for i in range(len(nb_filter)):
     embedded = Convolution1D(nb_filter=nb_filter[i],
                             filter_length=filter_length[i],
@@ -123,10 +136,11 @@ backward_sent = LSTM(128, return_sequences=False, dropout_W=0.2, dropout_U=0.2, 
 
 sent_encode = merge([forward_sent, backward_sent], mode='concat', concat_axis=-1)
 sent_encode = Dropout(0.3)(sent_encode)
-
+# sentence encoder
 encoder = Model(input=in_sentence, output=sent_encode)
-encoded = TimeDistributed(encoder)(sequence)
+encoded = TimeDistributed(encoder)(document)
 
+# encoded: sentences to bi-lstm for document encoding 
 forwards = LSTM(80, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu')(encoded)
 backwards = LSTM(80, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu', go_backwards=True)(encoded)
 
@@ -136,39 +150,22 @@ output = Dense(128, activation='relu')(output)
 output = Dropout(0.3)(output)
 output = Dense(1, activation='sigmoid')(output)
 
-model = Model(input=sequence, output=output)
+model = Model(input=document, output=output)
 
 
 if checkpoint:
     model.load_weights(checkpoint)
 
 file_name = os.path.basename(sys.argv[0]).split('.')[0]
-
 check_cb = keras.callbacks.ModelCheckpoint('checkpoints/'+file_name+'.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_loss',
                                            verbose=0, save_best_only=True, mode='min')
-
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, verbose=1, mode='auto')
-
-class LossHistory(keras.callbacks.Callback):
-    def on_train_begin(self, logs={}):
-        self.losses = []
-        self.accuracies = []
-
-    def on_batch_end(self, batch, logs={}):
-        self.losses.append(logs.get('loss'))
-        self.accuracies.append(logs.get('acc'))
-
 history = LossHistory()
-
-
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10,
-          nb_epoch=5, shuffle=True, callbacks=[history])
+          nb_epoch=5, shuffle=True, callbacks=[earlystop_cb,check_cb, history])
 
-import cPickle
-
+# just showing access to the history object
 print history.losses
 print history.accuracies
-
-cPickle.dump(history,open('checkpoints/'+file_name+'_history.pkl','wb'))

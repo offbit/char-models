@@ -120,25 +120,19 @@ def char_block(in_layer, nb_filter=[64, 100], filter_length=[3, 3], subsample=[2
 max_features = len(chars) + 1
 char_embedding = 40
 
-sequence = Input(shape=(max_sentences, maxlen), dtype='int64')
-
+document = Input(shape=(max_sentences, maxlen), dtype='int64')
 in_sentence = Input(shape=(maxlen, ), dtype='int64')
-# embedded = Embedding(max_features, char_embedding, input_length=maxlen)(in_sentence)
 
-# embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 
-# block1 = char_block(embedded, [100, 200, 128], filter_length=[3, 3, 1], subsample=[1, 1, 1], pool_length=[2, 2, 2])
 block2 = char_block(embedded, [100, 200, 200], filter_length=[5, 3, 3], subsample=[1, 1, 1], pool_length=[2, 2, 2])
 block3 = char_block(embedded, [200, 300, 300], filter_length=[7, 3, 3], subsample=[1, 1, 1], pool_length=[2, 2, 2])
 
 sent_encode = merge([block2, block3], mode='concat', concat_axis=-1)
-
-# sent_encode = Dense(128, activation='relu')(sent_encode)
 sent_encode = Dropout(0.4)(sent_encode)
 
 encoder = Model(input=in_sentence, output=sent_encode)
-encoded = TimeDistributed(encoder)(sequence)
+encoded = TimeDistributed(encoder)(document)
 
 lstm_h = 80
 forwards = LSTM(lstm_h, return_sequences=False, dropout_W=0.15, dropout_U=0.15,
@@ -150,7 +144,7 @@ merged = merge([forwards, backwards], mode='concat', concat_axis=-1)
 output = Dropout(0.3)(merged)
 output = Dense(1, activation='sigmoid')(output)
 
-model = Model(input=sequence, output=output)
+model = Model(input=document, output=output)
 
 
 if checkpoint:
@@ -162,15 +156,9 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/'+file_name+'.{epoch:02d
                                            verbose=0, save_best_only=True, mode='min')
 
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
-logger_cb = keras.callbacks.BaseLogger()
 
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10,
-          nb_epoch=30, shuffle=True, callbacks=[check_cb])
+          nb_epoch=30, shuffle=True, callbacks=[check_cb, earlystop_cb])
 
-print logger_cb
-# loss = model.evaluate(X_test, y_test, batch_size=16)
-# print loss
-
-# model.save_weights('checkpoints/doc-cnn3.h5', overwrite=True)

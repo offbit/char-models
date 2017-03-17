@@ -1,14 +1,12 @@
 import pandas as pd
 from keras.models import Model
-from keras.layers import Dense, Activation, Flatten, Input, Dropout, MaxPooling1D, Convolution1D
-from keras.layers import LSTM, Lambda, merge, Masking
-from keras.layers import Embedding, TimeDistributed
+from keras.layers import Dense, Input, Dropout, MaxPooling1D, Conv1D
+from keras.layers import LSTM, Lambda
+from keras.layers import TimeDistributed, Bidirectional
 from keras.layers.normalization import BatchNormalization
-from keras.optimizers import SGD
 import numpy as np
 import tensorflow as tf
 import re
-from keras import backend as K
 import keras.callbacks
 import sys
 import os
@@ -22,10 +20,6 @@ def binarize_outshape(in_shape):
     return in_shape[0], in_shape[1], 71
 
 
-def max_1d(x):
-    return K.max(x, axis=1)
-
-
 def striphtml(html):
     p = re.compile(r'<.*?>')
     return p.sub('', html)
@@ -34,7 +28,8 @@ def striphtml(html):
 def clean(s):
     return re.sub(r'[^\x00-\x7f]', r'', s)
 
-# record history of training 
+
+# record history of training
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.losses = []
@@ -54,7 +49,6 @@ if len(sys.argv) == 2:
     if os.path.exists(str(sys.argv[1])):
         print ("Checkpoint : %s" % str(sys.argv[1]))
         checkpoint = str(sys.argv[1])
-
 
 data = pd.read_csv("labeledTrainData.tsv", header=0, delimiter="\t", quoting=3)
 txt = ''
@@ -92,7 +86,7 @@ for i, doc in enumerate(docs):
     for j, sentence in enumerate(doc):
         if j < max_sentences:
             for t, char in enumerate(sentence[-maxlen:]):
-                X[i, j, (maxlen-1-t)] = char_indices[char]
+                X[i, j, (maxlen - 1 - t)] = char_indices[char]
 
 print('Sample chars in X:{}'.format(X[1200, 2]))
 print('y:{}'.format(y[1200]))
@@ -121,50 +115,52 @@ in_sentence = Input(shape=(maxlen,), dtype='int64')
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 # embedded: encodes sentence
 for i in range(len(nb_filter)):
-    embedded = Convolution1D(nb_filter=nb_filter[i],
-                            filter_length=filter_length[i],
-                            border_mode='valid',
-                            activation='relu',
-                            init='glorot_normal',
-                            subsample_length=1)(embedded)
+    embedded = Conv1D(filters=nb_filter[i],
+                      kernel_size=filter_length[i],
+                      padding='valid',
+                      activation='relu',
+                      kernel_initializer='glorot_normal',
+                      strides=1)(embedded)
 
     embedded = Dropout(0.1)(embedded)
-    embedded = MaxPooling1D(pool_length=pool_length)(embedded)
+    embedded = MaxPooling1D(pool_size=pool_length)(embedded)
 
-forward_sent = LSTM(128, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu')(embedded)
-backward_sent = LSTM(128, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu', go_backwards=True)(embedded)
+bi_lstm_sent = \
+    Bidirectional(LSTM(128, return_sequences=False, dropout=0.15, recurrent_dropout=0.15, implementation=0))(embedded)
 
-sent_encode = merge([forward_sent, backward_sent], mode='concat', concat_axis=-1)
-sent_encode = Dropout(0.3)(sent_encode)
+# sent_encode = merge([forward_sent, backward_sent], mode='concat', concat_axis=-1)
+sent_encode = Dropout(0.3)(bi_lstm_sent)
 # sentence encoder
-encoder = Model(input=in_sentence, output=sent_encode)
+encoder = Model(inputs=in_sentence, outputs=sent_encode)
+encoder.summary()
+
 encoded = TimeDistributed(encoder)(document)
-
 # encoded: sentences to bi-lstm for document encoding 
-forwards = LSTM(80, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu')(encoded)
-backwards = LSTM(80, return_sequences=False, dropout_W=0.2, dropout_U=0.2, consume_less='gpu', go_backwards=True)(encoded)
+b_lstm_doc = \
+    Bidirectional(LSTM(128, return_sequences=False, dropout=0.15, recurrent_dropout=0.15, implementation=0))(encoded)
 
-merged = merge([forwards, backwards], mode='concat', concat_axis=-1)
-output = Dropout(0.3)(merged)
+output = Dropout(0.3)(b_lstm_doc)
 output = Dense(128, activation='relu')(output)
 output = Dropout(0.3)(output)
 output = Dense(1, activation='sigmoid')(output)
 
-model = Model(input=document, output=output)
+model = Model(inputs=document, outputs=output)
 
+model.summary()
 
 if checkpoint:
     model.load_weights(checkpoint)
 
 file_name = os.path.basename(sys.argv[0]).split('.')[0]
-check_cb = keras.callbacks.ModelCheckpoint('checkpoints/'+file_name+'.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_loss',
+check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch:02d}-{val_loss:.2f}.hdf5',
+                                           monitor='val_loss',
                                            verbose=0, save_best_only=True, mode='min')
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, verbose=1, mode='auto')
 history = LossHistory()
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10,
-          nb_epoch=5, shuffle=True, callbacks=[earlystop_cb,check_cb, history])
+          epochs=5, shuffle=True, callbacks=[earlystop_cb, check_cb, history])
 
 # just showing access to the history object
 print history.losses

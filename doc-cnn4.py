@@ -4,7 +4,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, Dropout, MaxPooling1D, Conv1D, GlobalMaxPool1D
 from keras.layers import LSTM, Lambda, Bidirectional, concatenate, BatchNormalization
 from keras.layers import TimeDistributed
-
+from keras.optimizers import Adam, RMSprop
 import numpy as np
 import tensorflow as tf
 import re
@@ -12,7 +12,6 @@ import keras.callbacks
 import sys
 import os
 
-from keras.optimizers import Adam
 
 def binarize(x, sz=71):
     return tf.to_float(tf.one_hot(x, sz, on_value=1, off_value=0, axis=-1))
@@ -113,7 +112,7 @@ def char_block(in_layer, nb_filter=(64, 100), filter_length=(3, 3), subsample=(2
 
     # block = Lambda(max_1d, output_shape=(nb_filter[-1],))(block)
     block = GlobalMaxPool1D()(block)
-    block = Dense(256, activation='relu')(block)
+    block = Dense(128, activation='relu')(block)
     return block
 
 
@@ -125,8 +124,8 @@ in_sentence = Input(shape=(maxlen,), dtype='int64')
 
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 
-block2 = char_block(embedded, (128, 200, 200), filter_length=(5, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
-block3 = char_block(embedded, (200, 300, 300), filter_length=(7, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
+block2 = char_block(embedded, (128, 200), filter_length=(5, 3), subsample=(1, 1), pool_length=(2, 2))
+block3 = char_block(embedded, (200, 300), filter_length=(7, 3), subsample=(1, 1), pool_length=(2, 2))
 
 sent_encode = concatenate([block2, block3], axis=-1)
 sent_encode = Dropout(0.2)(sent_encode)
@@ -136,12 +135,12 @@ encoder.summary()
 
 encoded = TimeDistributed(encoder)(document)
 
-lstm_h = 128
+lstm_h = 92
 
 bi_lstm = \
     Bidirectional(LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0))(encoded)
-output = Dropout(0.2)(bi_lstm)
-output = Dense(1, activation='sigmoid')(output)
+# output = Dropout(0.2)(bi_lstm)
+output = Dense(1, activation='sigmoid')(bi_lstm)
 
 model = Model(outputs=output, inputs=document)
 
@@ -158,7 +157,7 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch
 
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
 
-optimizer = Adam(lr=0.001)
+optimizer = Adam(lr=0.005)
 
 model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 

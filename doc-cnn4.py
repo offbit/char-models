@@ -106,7 +106,7 @@ def char_block(in_layer, nb_filter=(64, 100), filter_length=(3, 3), subsample=(2
                        activation='relu',
                        strides=subsample[i])(block)
 
-        block = BatchNormalization()(block)
+        # block = BatchNormalization()(block)
         block = Dropout(0.1)(block)
         if pool_length[i]:
             block = MaxPooling1D(pool_size=pool_length[i])(block)
@@ -125,7 +125,7 @@ in_sentence = Input(shape=(maxlen,), dtype='int64')
 
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 
-block2 = char_block(embedded, (100, 200, 200), filter_length=(5, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
+block2 = char_block(embedded, (128, 200, 200), filter_length=(5, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
 block3 = char_block(embedded, (200, 300, 300), filter_length=(7, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
 
 sent_encode = concatenate([block2, block3], axis=-1)

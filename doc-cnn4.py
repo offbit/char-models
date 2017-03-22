@@ -2,7 +2,7 @@ import pandas as pd
 
 from keras.models import Model
 from keras.layers import Dense, Input, Dropout, MaxPooling1D, Conv1D, GlobalMaxPool1D
-from keras.layers import LSTM, Lambda, Bidirectional, concatenate
+from keras.layers import LSTM, Lambda, Bidirectional, concatenate, BatchNormalization
 from keras.layers import TimeDistributed
 
 import numpy as np
@@ -102,18 +102,18 @@ def char_block(in_layer, nb_filter=(64, 100), filter_length=(3, 3), subsample=(2
 
         block = Conv1D(filters=nb_filter[i],
                        kernel_size=filter_length[i],
-                       padding='valid',
+                       padding='same',
                        activation='relu',
                        strides=subsample[i])(block)
 
-        # block = BatchNormalization()(block)
+        block = BatchNormalization()(block)
         block = Dropout(0.1)(block)
         if pool_length[i]:
             block = MaxPooling1D(pool_size=pool_length[i])(block)
 
     # block = Lambda(max_1d, output_shape=(nb_filter[-1],))(block)
     block = GlobalMaxPool1D()(block)
-    block = Dense(128, activation='relu')(block)
+    block = Dense(256, activation='relu')(block)
     return block
 
 
@@ -129,18 +129,18 @@ block2 = char_block(embedded, (100, 200, 200), filter_length=(5, 3, 3), subsampl
 block3 = char_block(embedded, (200, 300, 300), filter_length=(7, 3, 3), subsample=(1, 1, 1), pool_length=(2, 2, 2))
 
 sent_encode = concatenate([block2, block3], axis=-1)
-sent_encode = Dropout(0.4)(sent_encode)
+sent_encode = Dropout(0.2)(sent_encode)
 
 encoder = Model(inputs=in_sentence, outputs=sent_encode)
 encoder.summary()
 
 encoded = TimeDistributed(encoder)(document)
 
-lstm_h = 80
+lstm_h = 128
 
 bi_lstm = \
     Bidirectional(LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0))(encoded)
-output = Dropout(0.25)(bi_lstm)
+output = Dropout(0.2)(bi_lstm)
 output = Dense(1, activation='sigmoid')(output)
 
 model = Model(outputs=output, inputs=document)

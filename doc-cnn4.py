@@ -4,7 +4,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, Dropout, MaxPooling1D, Conv1D, GlobalMaxPool1D
 from keras.layers import LSTM, Lambda, Bidirectional, concatenate, BatchNormalization
 from keras.layers import TimeDistributed
-from keras.optimizers import Adam, RMSprop
+from keras.optimizers import Adam
 import numpy as np
 import tensorflow as tf
 import re
@@ -161,5 +161,4 @@ optimizer = Adam(lr=0.005)
 
 model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10,
-          epochs=30, shuffle=True, callbacks=[check_cb, earlystop_cb])
+model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10, epochs=30, shuffle=True, callbacks=[check_cb, earlystop_cb])

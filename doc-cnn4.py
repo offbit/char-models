@@ -138,10 +138,9 @@ encoded = TimeDistributed(encoder)(document)
 
 lstm_h = 92
 
-bi_lstm = \
-    Bidirectional(LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0))(encoded)
+lstm_layer = LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0)(encoded)
 # output = Dropout(0.2)(bi_lstm)
-output = Dense(1, activation='sigmoid')(bi_lstm)
+output = Dense(1, activation='sigmoid')(lstm_layer)
 
 model = Model(outputs=output, inputs=document)
 
@@ -159,7 +158,7 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
 
 optimizer = Adam(lr=0.005)
-K._LEARNING_PHASE = tf.constant(1)
+
 
 model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 

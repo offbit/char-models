@@ -5,6 +5,7 @@ from keras.layers import Dense, Input, Dropout, MaxPooling1D, Conv1D, GlobalMaxP
 from keras.layers import LSTM, Lambda, Bidirectional, concatenate, BatchNormalization
 from keras.layers import TimeDistributed
 from keras.optimizers import Adam
+import keras.backend as K
 import numpy as np
 import tensorflow as tf
 import re
@@ -158,6 +159,7 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
 
 optimizer = Adam(lr=0.005)
+K._LEARNING_PHASE = tf.constant(1)
 
 model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 

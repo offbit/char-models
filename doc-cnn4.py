@@ -106,7 +106,7 @@ def char_block(in_layer, nb_filter=(64, 100), filter_length=(3, 3), subsample=(2
                        strides=subsample[i])(block)
 
         # block = BatchNormalization()(block)
-        block = Dropout(0.1)(block)
+        # block = Dropout(0.1)(block)
         if pool_length[i]:
             block = MaxPooling1D(pool_size=pool_length[i])(block)
 

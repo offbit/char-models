@@ -128,7 +128,7 @@ block2 = char_block(embedded, (128, 200), filter_length=(5, 3), subsample=(1, 1)
 block3 = char_block(embedded, (200, 300), filter_length=(7, 3), subsample=(1, 1), pool_length=(2, 2))
 
 sent_encode = concatenate([block2, block3], axis=-1)
-sent_encode = Dropout(0.2)(sent_encode)
+# sent_encode = Dropout(0.2)(sent_encode)
 
 encoder = Model(inputs=in_sentence, outputs=sent_encode)
 encoder.summary()

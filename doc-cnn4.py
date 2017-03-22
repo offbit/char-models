@@ -102,7 +102,7 @@ def char_block(in_layer, nb_filter=(64, 100), filter_length=(3, 3), subsample=(2
 
         block = Conv1D(filters=nb_filter[i],
                        kernel_size=filter_length[i],
-                       padding='same',
+                       padding='valid',
                        activation='relu',
                        strides=subsample[i])(block)
 

@@ -125,8 +125,8 @@ in_sentence = Input(shape=(maxlen,), dtype='int64')
 
 embedded = Lambda(binarize, output_shape=binarize_outshape)(in_sentence)
 
-block2 = char_block(embedded, (128, 200), filter_length=(5, 3), subsample=(1, 1), pool_length=(2, 2))
-block3 = char_block(embedded, (200, 300), filter_length=(7, 3), subsample=(1, 1), pool_length=(2, 2))
+block2 = char_block(embedded, (128, 256), filter_length=(5, 5), subsample=(1, 1), pool_length=(2, 2))
+block3 = char_block(embedded, (192, 320), filter_length=(7, 5), subsample=(1, 1), pool_length=(2, 2))
 
 sent_encode = concatenate([block2, block3], axis=-1)
 # sent_encode = Dropout(0.2)(sent_encode)
@@ -138,9 +138,11 @@ encoded = TimeDistributed(encoder)(document)
 
 lstm_h = 92
 
-lstm_layer = LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0)(encoded)
+lstm_layer = LSTM(lstm_h, return_sequences=True, dropout=0.1, recurrent_dropout=0.1, implementation=0)(encoded)
+lstm_layer2 = LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0)(lstm_layer)
+
 # output = Dropout(0.2)(bi_lstm)
-output = Dense(1, activation='sigmoid')(lstm_layer)
+output = Dense(1, activation='sigmoid')(lstm_layer2)
 
 model = Model(outputs=output, inputs=document)
 
@@ -157,9 +159,7 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch
 
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
 
-optimizer = Adam(lr=0.005)
-
-
+optimizer = 'rmsprop'
 model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10, epochs=30, shuffle=True, callbacks=[check_cb, earlystop_cb])

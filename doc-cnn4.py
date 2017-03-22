@@ -12,6 +12,7 @@ import keras.callbacks
 import sys
 import os
 
+from keras.optimizers import Adam
 
 def binarize(x, sz=71):
     return tf.to_float(tf.one_hot(x, sz, on_value=1, off_value=0, axis=-1))
@@ -138,8 +139,8 @@ encoded = TimeDistributed(encoder)(document)
 lstm_h = 80
 
 bi_lstm = \
-    Bidirectional(LSTM(lstm_h, return_sequences=False, dropout=0.15, recurrent_dropout=0.15, implementation=0))(encoded)
-output = Dropout(0.3)(bi_lstm)
+    Bidirectional(LSTM(lstm_h, return_sequences=False, dropout=0.1, recurrent_dropout=0.1, implementation=0))(encoded)
+output = Dropout(0.25)(bi_lstm)
 output = Dense(1, activation='sigmoid')(output)
 
 model = Model(outputs=output, inputs=document)
@@ -157,7 +158,9 @@ check_cb = keras.callbacks.ModelCheckpoint('checkpoints/' + file_name + '.{epoch
 
 earlystop_cb = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
 
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+optimizer = Adam(lr=0.001)
+
+model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=10,
           epochs=30, shuffle=True, callbacks=[check_cb, earlystop_cb])
